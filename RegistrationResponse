@@ -1,0 +1,7 @@
+//Created by Balkrishan sharma
+//07-01-26
+import Foundation
+
+struct RegistrationResponse: Codable {
+    let d: Doctor
+}
