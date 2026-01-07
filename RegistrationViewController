@@ -1,0 +1,686 @@
+//Created by Balkrishan sharma
+//07-01-26
+import UIKit
+import Combine
+
+class RegistrationViewController: UIViewController {
+    
+    // MARK: - Properties
+    private let viewModel = RegistrationViewModel()
+    private var cancellables = Set<AnyCancellable>()
+    
+    // MARK: - UI Components
+    private let scrollView: UIScrollView = {
+        let scrollView = UIScrollView()
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.keyboardDismissMode = .interactive
+        return scrollView
+    }()
+    
+    private let contentStackView: UIStackView = {
+        let stackView = UIStackView()
+        stackView.axis = .vertical
+        stackView.spacing = 20
+        stackView.translatesAutoresizingMaskIntoConstraints = false
+        return stackView
+    }()
+    
+    // Progress Indicator
+    private let progressContainer: UIView = {
+        let view = UIView()
+        view.translatesAutoresizingMaskIntoConstraints = false
+        return view
+    }()
+    
+    private let progressBar1: UIView = {
+        let view = UIView()
+        view.backgroundColor = .systemOrange
+        view.translatesAutoresizingMaskIntoConstraints = false
+        return view
+    }()
+    
+    private let progressBar2: UIView = {
+        let view = UIView()
+        view.backgroundColor = UIColor.gray.withAlphaComponent(0.3)
+        view.translatesAutoresizingMaskIntoConstraints = false
+        return view
+    }()
+    
+    private let progressLabel: UILabel = {
+        let label = UILabel()
+        label.text = "2/4"
+        label.font = .systemFont(ofSize: 12)
+        label.textColor = .gray
+        label.textAlignment = .center
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+    
+    // Title Section
+    private let titleLabel: UILabel = {
+        let label = UILabel()
+        label.text = "Basic Details"
+        label.font = .systemFont(ofSize: 24, weight: .bold)
+        label.textAlignment = .center
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+    
+    private let subtitleLabel: UILabel = {
+        let label = UILabel()
+        label.text = "Feel free to fill your details"
+        label.font = .systemFont(ofSize: 15)
+        label.textColor = .gray
+        label.textAlignment = .center
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+    
+    // Form Fields
+    private lazy var fullNameField = createTextField(placeholder: "Enter your full name", label: "Full Name", isRequired: true)
+    private lazy var fullNameError = createErrorLabel()
+    
+    private lazy var emailField = createTextField(placeholder: "example@email.com", label: "Email ID", isRequired: true, keyboardType: .emailAddress)
+    private lazy var emailError = createErrorLabel()
+    
+    private lazy var phoneField = createTextField(placeholder: "10-digit mobile number", label: "Phone Number", isRequired: true, keyboardType: .phonePad)
+    private lazy var phoneError = createErrorLabel()
+    
+    private lazy var whatsappField = createTextField(placeholder: "10-digit mobile number", label: "WhatsApp Number", isRequired: true, keyboardType: .phonePad)
+    private lazy var whatsappError = createErrorLabel()
+    
+    private let sameAsPhoneButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.setTitle("Same as Phone", for: .normal)
+        button.titleLabel?.font = .systemFont(ofSize: 12)
+        button.setTitleColor(.systemBlue, for: .normal)
+        button.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.1)
+        button.layer.cornerRadius = 6
+        button.translatesAutoresizingMaskIntoConstraints = false
+        return button
+    }()
+    
+    private lazy var ageField = createTextField(placeholder: "Enter age in years", label: "Age", isRequired: true, keyboardType: .numberPad)
+    private lazy var ageError = createErrorLabel()
+    
+    // Gender Selection
+    private let genderLabel: UILabel = {
+        let label = UILabel()
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+    
+    private lazy var maleButton = GenderButton(title: "Male", isSelected: true)
+    private lazy var femaleButton = GenderButton(title: "Female", isSelected: false)
+    private lazy var otherButton = GenderButton(title: "Others", isSelected: false)
+    
+    private lazy var genderStackView: UIStackView = {
+        let stackView = UIStackView(arrangedSubviews: [maleButton, femaleButton, otherButton])
+        stackView.axis = .horizontal
+        stackView.spacing = 12
+        stackView.distribution = .fillEqually
+        stackView.translatesAutoresizingMaskIntoConstraints = false
+        return stackView
+    }()
+    
+    // Fixed Fields
+    private lazy var countryCodeField = createFixedField(label: "Country Code", value: "IN (India)")
+    private lazy var ageUnitField = createFixedField(label: "Age Unit", value: "Years (Y)")
+    
+    // Submit Button
+    private let submitButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.backgroundColor = .systemBlue
+        button.layer.cornerRadius = 30
+        button.translatesAutoresizingMaskIntoConstraints = false
+        
+        let config = UIImage.SymbolConfiguration(pointSize: 24)
+        let image = UIImage(systemName: "arrow.right", withConfiguration: config)
+        button.setImage(image, for: .normal)
+        button.tintColor = .white
+        
+        button.layer.shadowColor = UIColor.systemBlue.cgColor
+        button.layer.shadowOpacity = 0.3
+        button.layer.shadowOffset = CGSize(width: 0, height: 5)
+        button.layer.shadowRadius = 10
+        
+        return button
+    }()
+    
+    private let activityIndicator: UIActivityIndicatorView = {
+        let indicator = UIActivityIndicatorView(style: .medium)
+        indicator.color = .white
+        indicator.hidesWhenStopped = true
+        indicator.translatesAutoresizingMaskIntoConstraints = false
+        return indicator
+    }()
+    
+    // MARK: - Lifecycle
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        setupUI()
+        setupBindings()
+        setupActions()
+        setupKeyboardHandling()
+    }
+    
+    // MARK: - Setup
+    private func setupUI() {
+        view.backgroundColor = .systemBackground
+        title = "Registration"
+        
+        // Add close button
+        navigationItem.leftBarButtonItem = UIBarButtonItem(
+            image: UIImage(systemName: "chevron.left"),
+            style: .plain,
+            target: self,
+            action: #selector(closeTapped)
+        )
+        
+        // Set text field delegates
+        fullNameField.delegate = self
+        emailField.delegate = self
+        phoneField.delegate = self
+        whatsappField.delegate = self
+        ageField.delegate = self
+        
+        view.addSubview(scrollView)
+        scrollView.addSubview(contentStackView)
+        
+        // Setup progress
+        setupProgress()
+        contentStackView.addArrangedSubview(progressContainer)
+        contentStackView.addArrangedSubview(progressLabel)
+        
+        // Add title section
+        contentStackView.addArrangedSubview(titleLabel)
+        contentStackView.addArrangedSubview(subtitleLabel)
+        contentStackView.setCustomSpacing(30, after: subtitleLabel)
+        
+        // Add form fields
+        addFormField(label: "Full Name", textField: fullNameField, errorLabel: fullNameError)
+        addFormField(label: "Email ID", textField: emailField, errorLabel: emailError)
+        addFormField(label: "Phone Number", textField: phoneField, errorLabel: phoneError)
+        
+        // WhatsApp with button
+        let whatsappContainer = UIView()
+        whatsappContainer.translatesAutoresizingMaskIntoConstraints = false
+        
+        let whatsappStack = UIStackView(arrangedSubviews: [whatsappField, sameAsPhoneButton])
+        whatsappStack.axis = .horizontal
+        whatsappStack.spacing = 8
+        whatsappStack.translatesAutoresizingMaskIntoConstraints = false
+        
+        whatsappContainer.addSubview(whatsappStack)
+        
+        NSLayoutConstraint.activate([
+            whatsappStack.topAnchor.constraint(equalTo: whatsappContainer.topAnchor),
+            whatsappStack.leadingAnchor.constraint(equalTo: whatsappContainer.leadingAnchor),
+            whatsappStack.trailingAnchor.constraint(equalTo: whatsappContainer.trailingAnchor),
+            whatsappStack.bottomAnchor.constraint(equalTo: whatsappContainer.bottomAnchor),
+            
+            sameAsPhoneButton.widthAnchor.constraint(equalToConstant: 110),
+            sameAsPhoneButton.heightAnchor.constraint(equalToConstant: 36)
+        ])
+        
+        addFormField(label: "WhatsApp Number", container: whatsappContainer, errorLabel: whatsappError)
+        
+        addFormField(label: "Age", textField: ageField, errorLabel: ageError)
+        
+        // Gender
+        let genderAttributed = NSMutableAttributedString(string: "Gender ")
+        genderAttributed.append(NSAttributedString(string: "*", attributes: [.foregroundColor: UIColor.red, .font: UIFont.boldSystemFont(ofSize: 15)]))
+        genderLabel.attributedText = genderAttributed
+        genderLabel.font = .systemFont(ofSize: 15, weight: .medium)
+        
+        contentStackView.addArrangedSubview(genderLabel)
+        contentStackView.addArrangedSubview(genderStackView)
+        
+        // Fixed fields
+        contentStackView.addArrangedSubview(countryCodeField)
+        contentStackView.addArrangedSubview(ageUnitField)
+        
+        // Submit button
+        submitButton.addSubview(activityIndicator)
+        contentStackView.addArrangedSubview(submitButton)
+        
+        setupConstraints()
+    }
+    
+    private func setupProgress() {
+        let progressStack = UIStackView(arrangedSubviews: [progressBar1, progressBar2])
+        progressStack.axis = .horizontal
+        progressStack.spacing = 0
+        progressStack.distribution = .fillEqually
+        progressStack.translatesAutoresizingMaskIntoConstraints = false
+        
+        progressContainer.addSubview(progressStack)
+        
+        NSLayoutConstraint.activate([
+            progressStack.topAnchor.constraint(equalTo: progressContainer.topAnchor),
+            progressStack.leadingAnchor.constraint(equalTo: progressContainer.leadingAnchor, constant: 16),
+            progressStack.trailingAnchor.constraint(equalTo: progressContainer.trailingAnchor, constant: -16),
+            progressStack.bottomAnchor.constraint(equalTo: progressContainer.bottomAnchor),
+            progressStack.heightAnchor.constraint(equalToConstant: 3)
+        ])
+    }
+    
+    private func setupConstraints() {
+        NSLayoutConstraint.activate([
+            scrollView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            
+            contentStackView.topAnchor.constraint(equalTo: scrollView.topAnchor, constant: 20),
+            contentStackView.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor, constant: 16),
+            contentStackView.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor, constant: -16),
+            contentStackView.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: -30),
+            contentStackView.widthAnchor.constraint(equalTo: scrollView.widthAnchor, constant: -32),
+            
+            submitButton.widthAnchor.constraint(equalToConstant: 60),
+            submitButton.heightAnchor.constraint(equalToConstant: 60),
+            submitButton.centerXAnchor.constraint(equalTo: contentStackView.centerXAnchor),
+            
+            activityIndicator.centerXAnchor.constraint(equalTo: submitButton.centerXAnchor),
+            activityIndicator.centerYAnchor.constraint(equalTo: submitButton.centerYAnchor)
+        ])
+    }
+    
+    private func setupBindings() {
+        // Full Name
+        fullNameField.addTarget(self, action: #selector(fullNameChanged), for: .editingChanged)
+        viewModel.fullName
+            .sink { [weak self] _ in
+                self?.updateValidationUI()
+            }
+            .store(in: &cancellables)
+        
+        // Email
+        emailField.addTarget(self, action: #selector(emailChanged), for: .editingChanged)
+        viewModel.email
+            .sink { [weak self] _ in
+                self?.updateValidationUI()
+            }
+            .store(in: &cancellables)
+        
+        // Phone
+        phoneField.addTarget(self, action: #selector(phoneChanged), for: .editingChanged)
+        viewModel.phoneNo
+            .sink { [weak self] _ in
+                self?.updateValidationUI()
+            }
+            .store(in: &cancellables)
+        
+        // WhatsApp
+        whatsappField.addTarget(self, action: #selector(whatsappChanged), for: .editingChanged)
+        viewModel.whatsappNo
+            .sink { [weak self] _ in
+                self?.updateValidationUI()
+            }
+            .store(in: &cancellables)
+        
+        // Age
+        ageField.addTarget(self, action: #selector(ageChanged), for: .editingChanged)
+        viewModel.age
+            .sink { [weak self] _ in
+                self?.updateValidationUI()
+            }
+            .store(in: &cancellables)
+        
+        // Loading state
+        viewModel.isLoading
+            .sink { [weak self] isLoading in
+                self?.updateLoadingState(isLoading)
+            }
+            .store(in: &cancellables)
+        
+        // Show error
+        viewModel.showError
+            .sink { [weak self] showError in
+                guard showError, let errorMessage = self?.viewModel.errorMessage.value else { return }
+                self?.showAlert(title: "Error", message: errorMessage)
+            }
+            .store(in: &cancellables)
+        
+        // Registration success
+        viewModel.registrationSuccess
+            .sink { [weak self] success in
+                guard success else { return }
+                self?.showSuccessAlert()
+            }
+            .store(in: &cancellables)
+    }
+    
+    private func setupActions() {
+        maleButton.addTarget(self, action: #selector(genderButtonTapped(_:)), for: .touchUpInside)
+        femaleButton.addTarget(self, action: #selector(genderButtonTapped(_:)), for: .touchUpInside)
+        otherButton.addTarget(self, action: #selector(genderButtonTapped(_:)), for: .touchUpInside)
+        
+        sameAsPhoneButton.addTarget(self, action: #selector(sameAsPhoneTapped), for: .touchUpInside)
+        submitButton.addTarget(self, action: #selector(submitTapped), for: .touchUpInside)
+    }
+    
+    private func setupKeyboardHandling() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(keyboardWillShow),
+            name: UIResponder.keyboardWillShowNotification,
+            object: nil
+        )
+        
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(keyboardWillHide),
+            name: UIResponder.keyboardWillHideNotification,
+            object: nil
+        )
+        
+        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(dismissKeyboard))
+        view.addGestureRecognizer(tapGesture)
+    }
+    
+    // MARK: - Helper Methods
+    private func createTextField(placeholder: String, label: String, isRequired: Bool = false, keyboardType: UIKeyboardType = .default) -> UITextField {
+        let textField = UITextField()
+        textField.placeholder = placeholder
+        textField.font = .systemFont(ofSize: 16)
+        textField.borderStyle = .none
+        textField.backgroundColor = UIColor.systemGray6
+        textField.layer.cornerRadius = 8
+        textField.layer.masksToBounds = true
+        textField.layer.borderWidth = 0 // Will be set to 1 on error
+        textField.keyboardType = keyboardType
+        textField.autocapitalizationType = keyboardType == .emailAddress ? .none : .sentences
+        textField.translatesAutoresizingMaskIntoConstraints = false
+        
+        let paddingView = UIView(frame: CGRect(x: 0, y: 0, width: 16, height: 50))
+        textField.leftView = paddingView
+        textField.leftViewMode = .always
+        textField.rightView = UIView(frame: CGRect(x: 0, y: 0, width: 16, height: 50))
+        textField.rightViewMode = .always
+        
+        textField.heightAnchor.constraint(equalToConstant: 50).isActive = true
+        
+        return textField
+    }
+    
+    private func createErrorLabel() -> UILabel {
+        let label = UILabel()
+        label.font = .systemFont(ofSize: 12)
+        label.textColor = .systemRed
+        label.numberOfLines = 0
+        label.isHidden = true
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }
+    
+    private func createFixedField(label: String, value: String) -> UIView {
+        let container = UIView()
+        container.translatesAutoresizingMaskIntoConstraints = false
+        
+        let labelView = UILabel()
+        labelView.text = label
+        labelView.font = .systemFont(ofSize: 15, weight: .medium)
+        labelView.translatesAutoresizingMaskIntoConstraints = false
+        
+        // Use UIView instead of UILabel to avoid double text rendering
+        let valueView = UIView()
+        valueView.backgroundColor = UIColor.systemGray6.withAlphaComponent(0.5)
+        valueView.layer.cornerRadius = 8
+        valueView.layer.masksToBounds = true
+        valueView.translatesAutoresizingMaskIntoConstraints = false
+        
+        let textLabel = UILabel()
+        textLabel.text = value
+        textLabel.font = .systemFont(ofSize: 16)
+        textLabel.textColor = .gray
+        textLabel.translatesAutoresizingMaskIntoConstraints = false
+        valueView.addSubview(textLabel)
+        
+        container.addSubview(labelView)
+        container.addSubview(valueView)
+        
+        NSLayoutConstraint.activate([
+            labelView.topAnchor.constraint(equalTo: container.topAnchor),
+            labelView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            labelView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            
+            valueView.topAnchor.constraint(equalTo: labelView.bottomAnchor, constant: 8),
+            valueView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            valueView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            valueView.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+            valueView.heightAnchor.constraint(equalToConstant: 50),
+            
+            textLabel.leadingAnchor.constraint(equalTo: valueView.leadingAnchor, constant: 16),
+            textLabel.centerYAnchor.constraint(equalTo: valueView.centerYAnchor),
+            textLabel.trailingAnchor.constraint(equalTo: valueView.trailingAnchor, constant: -16)
+        ])
+        
+        return container
+    }
+    
+    private func addFormField(label: String, textField: UITextField? = nil, container: UIView? = nil, errorLabel: UILabel) {
+        let labelView = UILabel()
+        labelView.translatesAutoresizingMaskIntoConstraints = false
+        
+        let attributed = NSMutableAttributedString(string: label + " ")
+        attributed.append(NSAttributedString(string: "*", attributes: [.foregroundColor: UIColor.red, .font: UIFont.boldSystemFont(ofSize: 15)]))
+        labelView.attributedText = attributed
+        labelView.font = .systemFont(ofSize: 15, weight: .medium)
+        
+        contentStackView.addArrangedSubview(labelView)
+        
+        if let textField = textField {
+            contentStackView.addArrangedSubview(textField)
+        } else if let container = container {
+            contentStackView.addArrangedSubview(container)
+        }
+        
+        contentStackView.addArrangedSubview(errorLabel)
+        contentStackView.setCustomSpacing(4, after: errorLabel)
+    }
+    
+    private func updateValidationUI() {
+        // Update error labels
+        if let error = viewModel.getNameError() {
+            fullNameError.text = error
+            fullNameError.isHidden = false
+            fullNameField.layer.borderWidth = 1
+            fullNameField.layer.borderColor = UIColor.systemRed.cgColor
+        } else {
+            fullNameError.isHidden = true
+            fullNameField.layer.borderWidth = 0
+        }
+        
+        if let error = viewModel.getEmailError() {
+            emailError.text = error
+            emailError.isHidden = false
+            emailField.layer.borderWidth = 1
+            emailField.layer.borderColor = UIColor.systemRed.cgColor
+        } else {
+            emailError.isHidden = true
+            emailField.layer.borderWidth = 0
+        }
+        
+        if let error = viewModel.getPhoneError() {
+            phoneError.text = error
+            phoneError.isHidden = false
+            phoneField.layer.borderWidth = 1
+            phoneField.layer.borderColor = UIColor.systemRed.cgColor
+        } else {
+            phoneError.isHidden = true
+            phoneField.layer.borderWidth = 0
+        }
+        
+        if let error = viewModel.getWhatsappError() {
+            whatsappError.text = error
+            whatsappError.isHidden = false
+            whatsappField.layer.borderWidth = 1
+            whatsappField.layer.borderColor = UIColor.systemRed.cgColor
+        } else {
+            whatsappError.isHidden = true
+            whatsappField.layer.borderWidth = 0
+        }
+        
+        if let error = viewModel.getAgeError() {
+            ageError.text = error
+            ageError.isHidden = false
+            ageField.layer.borderWidth = 1
+            ageField.layer.borderColor = UIColor.systemRed.cgColor
+        } else {
+            ageError.isHidden = true
+            ageField.layer.borderWidth = 0
+        }
+        
+        // Update submit button
+        submitButton.backgroundColor = viewModel.isFormValid ? .systemBlue : .gray
+        submitButton.isEnabled = !viewModel.isLoading.value
+    }
+    
+    private func updateLoadingState(_ isLoading: Bool) {
+        if isLoading {
+            activityIndicator.startAnimating()
+            submitButton.imageView?.alpha = 0
+        } else {
+            activityIndicator.stopAnimating()
+            submitButton.imageView?.alpha = 1
+        }
+        submitButton.isEnabled = !isLoading
+    }
+    
+    private func showAlert(title: String, message: String) {
+        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        present(alert, animated: true)
+    }
+    
+    private func showSuccessAlert() {
+        let alert = UIAlertController(
+            title: "Success!",
+            message: "Doctor registered successfully!\nID: \(viewModel.doctorId.value ?? "N/A")",
+            preferredStyle: .alert
+        )
+        
+        alert.addAction(UIAlertAction(title: "View Doctors", style: .default) { [weak self] _ in
+            self?.dismiss(animated: true) {
+                // The presenting view controller can handle showing the doctor list
+            }
+        })
+        
+        alert.addAction(UIAlertAction(title: "OK", style: .cancel) { [weak self] _ in
+            self?.dismiss(animated: true)
+        })
+        
+        present(alert, animated: true)
+    }
+    
+    // MARK: - Actions
+    @objc private func closeTapped() {
+        dismiss(animated: true)
+    }
+    
+    @objc private func fullNameChanged() {
+        viewModel.fullName.send(fullNameField.text ?? "")
+    }
+    
+    @objc private func emailChanged() {
+        viewModel.email.send(emailField.text ?? "")
+    }
+    
+    @objc private func phoneChanged() {
+        let text = phoneField.text ?? ""
+        let filtered = String(text.prefix(10))
+        phoneField.text = filtered
+        viewModel.phoneNo.send(filtered)
+    }
+    
+    @objc private func whatsappChanged() {
+        let text = whatsappField.text ?? ""
+        let filtered = String(text.prefix(10))
+        whatsappField.text = filtered
+        viewModel.whatsappNo.send(filtered)
+    }
+    
+    @objc private func ageChanged() {
+        let text = ageField.text ?? ""
+        let filtered = String(text.prefix(3))
+        ageField.text = filtered
+        viewModel.age.send(filtered)
+    }
+    
+    @objc private func genderButtonTapped(_ sender: GenderButton) {
+        maleButton.setSelected(false)
+        femaleButton.setSelected(false)
+        otherButton.setSelected(false)
+        
+        sender.setSelected(true)
+        
+        if sender == maleButton {
+            viewModel.selectedGender.send("M")
+        } else if sender == femaleButton {
+            viewModel.selectedGender.send("F")
+        } else {
+            viewModel.selectedGender.send("O")
+        }
+    }
+    
+    @objc private func sameAsPhoneTapped() {
+        whatsappField.text = phoneField.text
+        viewModel.whatsappNo.send(phoneField.text ?? "")
+    }
+    
+    @objc private func submitTapped() {
+        Task {
+            await viewModel.register()
+        }
+    }
+    
+    @objc private func keyboardWillShow(notification: NSNotification) {
+        guard let keyboardFrame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect else { return }
+        
+        let contentInsets = UIEdgeInsets(top: 0, left: 0, bottom: keyboardFrame.height, right: 0)
+        scrollView.contentInset = contentInsets
+        scrollView.scrollIndicatorInsets = contentInsets
+    }
+    
+    @objc private func keyboardWillHide(notification: NSNotification) {
+        scrollView.contentInset = .zero
+        scrollView.scrollIndicatorInsets = .zero
+    }
+    
+    @objc private func dismissKeyboard() {
+        view.endEditing(true)
+    }
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+}
+
+// MARK: - UITextFieldDelegate
+extension RegistrationViewController: UITextFieldDelegate {
+    func textFieldDidEndEditing(_ textField: UITextField) {
+        // Trigger validation when user leaves a field
+        if viewModel.hasAttemptedSubmit.value {
+            updateValidationUI()
+        }
+    }
+    
+    func textFieldShouldReturn(_ textField: UITextField) -> Bool {
+        // Move to next field or dismiss keyboard
+        switch textField {
+        case fullNameField:
+            emailField.becomeFirstResponder()
+        case emailField:
+            phoneField.becomeFirstResponder()
+        case phoneField:
+            whatsappField.becomeFirstResponder()
+        case whatsappField:
+            ageField.becomeFirstResponder()
+        default:
+            textField.resignFirstResponder()
+        }
+        return true
+    }
+}
