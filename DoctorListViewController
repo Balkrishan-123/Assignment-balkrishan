@@ -1,0 +1,461 @@
+//Created By Balkrishan sharma
+//07-01-26
+import UIKit
+import Combine
+
+class DoctorListViewController: UIViewController {
+    
+    // MARK: - Properties
+    private let viewModel = DoctorListViewModel()
+    private var cancellables = Set<AnyCancellable>()
+    private var filteredDoctors: [Doctor] = []
+    
+    // MARK: - UI Components
+    private let searchBarContainer: UIView = {
+        let view = UIView()
+        view.backgroundColor = UIColor.systemGray6
+        view.layer.cornerRadius = 10
+        view.translatesAutoresizingMaskIntoConstraints = false
+        return view
+    }()
+    
+    private let searchIcon: UIImageView = {
+        let imageView = UIImageView()
+        imageView.image = UIImage(systemName: "magnifyingglass")
+        imageView.tintColor = .gray
+        imageView.contentMode = .scaleAspectFit
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        return imageView
+    }()
+    
+    private let searchTextField: UITextField = {
+        let textField = UITextField()
+        textField.placeholder = "Search by name, email, phone, or ID"
+        textField.font = .systemFont(ofSize: 16)
+        textField.borderStyle = .none
+        textField.translatesAutoresizingMaskIntoConstraints = false
+        return textField
+    }()
+    
+    private let clearButton: UIButton = {
+        let button = UIButton(type: .system)
+        let config = UIImage.SymbolConfiguration(pointSize: 16)
+        button.setImage(UIImage(systemName: "xmark.circle.fill", withConfiguration: config), for: .normal)
+        button.tintColor = .gray
+        button.isHidden = true
+        button.translatesAutoresizingMaskIntoConstraints = false
+        return button
+    }()
+    
+    private let resultsLabel: UILabel = {
+        let label = UILabel()
+        label.font = .systemFont(ofSize: 15)
+        label.textColor = .gray
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+    
+    private lazy var tableView: UITableView = {
+        let tableView = UITableView(frame: .zero, style: .plain)
+        tableView.backgroundColor = .systemGroupedBackground
+        tableView.separatorStyle = .none
+        tableView.translatesAutoresizingMaskIntoConstraints = false
+        tableView.register(DoctorTableViewCell.self, forCellReuseIdentifier: DoctorTableViewCell.identifier)
+        tableView.delegate = self
+        tableView.dataSource = self
+        return tableView
+    }()
+    
+    private let refreshControl: UIRefreshControl = {
+        let refreshControl = UIRefreshControl()
+        return refreshControl
+    }()
+    
+    private let loadingView: UIView = {
+        let view = UIView()
+        view.backgroundColor = UIColor.black.withAlphaComponent(0.3)
+        view.isHidden = true
+        view.translatesAutoresizingMaskIntoConstraints = false
+        return view
+    }()
+    
+    private let activityIndicator: UIActivityIndicatorView = {
+        let indicator = UIActivityIndicatorView(style: .large)
+        indicator.color = .white
+        indicator.translatesAutoresizingMaskIntoConstraints = false
+        return indicator
+    }()
+    
+    private let loadingLabel: UILabel = {
+        let label = UILabel()
+        label.text = "Loading doctors..."
+        label.font = .systemFont(ofSize: 16, weight: .medium)
+        label.textColor = .white
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+    
+    private let emptyStateView: UIView = {
+        let view = UIView()
+        view.isHidden = true
+        view.translatesAutoresizingMaskIntoConstraints = false
+        return view
+    }()
+    
+    private let emptyStateImageView: UIImageView = {
+        let imageView = UIImageView()
+        let config = UIImage.SymbolConfiguration(pointSize: 60, weight: .light)
+        imageView.image = UIImage(systemName: "person.3.fill", withConfiguration: config)
+        imageView.tintColor = UIColor.gray.withAlphaComponent(0.5)
+        imageView.contentMode = .scaleAspectFit
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        return imageView
+    }()
+    
+    private let emptyStateTitleLabel: UILabel = {
+        let label = UILabel()
+        label.text = "No Doctors Found"
+        label.font = .systemFont(ofSize: 20, weight: .semibold)
+        label.textAlignment = .center
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+    
+    private let emptyStateSubtitleLabel: UILabel = {
+        let label = UILabel()
+        label.text = "Register a doctor to see them here"
+        label.font = .systemFont(ofSize: 15)
+        label.textColor = .gray
+        label.textAlignment = .center
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+    
+    private let noResultsView: UIView = {
+        let view = UIView()
+        view.isHidden = true
+        view.translatesAutoresizingMaskIntoConstraints = false
+        return view
+    }()
+    
+    private let noResultsImageView: UIImageView = {
+        let imageView = UIImageView()
+        let config = UIImage.SymbolConfiguration(pointSize: 60, weight: .light)
+        imageView.image = UIImage(systemName: "magnifyingglass", withConfiguration: config)
+        imageView.tintColor = UIColor.gray.withAlphaComponent(0.5)
+        imageView.contentMode = .scaleAspectFit
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        return imageView
+    }()
+    
+    private let noResultsTitleLabel: UILabel = {
+        let label = UILabel()
+        label.text = "No Results Found"
+        label.font = .systemFont(ofSize: 20, weight: .semibold)
+        label.textAlignment = .center
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+    
+    private let noResultsSubtitleLabel: UILabel = {
+        let label = UILabel()
+        label.text = "Try searching with different keywords"
+        label.font = .systemFont(ofSize: 15)
+        label.textColor = .gray
+        label.textAlignment = .center
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+    
+    // MARK: - Lifecycle
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        setupUI()
+        setupBindings()
+        setupActions()
+        
+        Task {
+            await viewModel.fetchDoctors()
+        }
+    }
+    
+    // MARK: - Setup
+    private func setupUI() {
+        view.backgroundColor = .systemBackground
+        title = "Doctors List"
+        
+        // Navigation items
+        navigationController?.navigationBar.prefersLargeTitles = true
+        
+        navigationItem.leftBarButtonItem = UIBarButtonItem(
+            image: UIImage(systemName: "chevron.left"),
+            style: .plain,
+            target: self,
+            action: #selector(backTapped)
+        )
+        
+        navigationItem.rightBarButtonItem = UIBarButtonItem(
+            image: UIImage(systemName: "arrow.clockwise"),
+            style: .plain,
+            target: self,
+            action: #selector(refreshTapped)
+        )
+        
+        // Add subviews
+        view.addSubview(searchBarContainer)
+        searchBarContainer.addSubview(searchIcon)
+        searchBarContainer.addSubview(searchTextField)
+        searchBarContainer.addSubview(clearButton)
+        
+        view.addSubview(resultsLabel)
+        view.addSubview(tableView)
+        
+        tableView.refreshControl = refreshControl
+        
+        // Loading view
+        view.addSubview(loadingView)
+        loadingView.addSubview(activityIndicator)
+        loadingView.addSubview(loadingLabel)
+        
+        // Empty state
+        setupEmptyState()
+        view.addSubview(emptyStateView)
+        
+        // No results state
+        setupNoResultsState()
+        view.addSubview(noResultsView)
+        
+        setupConstraints()
+    }
+    
+    private func setupEmptyState() {
+        emptyStateView.addSubview(emptyStateImageView)
+        emptyStateView.addSubview(emptyStateTitleLabel)
+        emptyStateView.addSubview(emptyStateSubtitleLabel)
+        
+        NSLayoutConstraint.activate([
+            emptyStateImageView.centerXAnchor.constraint(equalTo: emptyStateView.centerXAnchor),
+            emptyStateImageView.centerYAnchor.constraint(equalTo: emptyStateView.centerYAnchor, constant: -40),
+            emptyStateImageView.widthAnchor.constraint(equalToConstant: 80),
+            emptyStateImageView.heightAnchor.constraint(equalToConstant: 80),
+            
+            emptyStateTitleLabel.topAnchor.constraint(equalTo: emptyStateImageView.bottomAnchor, constant: 20),
+            emptyStateTitleLabel.centerXAnchor.constraint(equalTo: emptyStateView.centerXAnchor),
+            emptyStateTitleLabel.leadingAnchor.constraint(greaterThanOrEqualTo: emptyStateView.leadingAnchor, constant: 20),
+            emptyStateTitleLabel.trailingAnchor.constraint(lessThanOrEqualTo: emptyStateView.trailingAnchor, constant: -20),
+            
+            emptyStateSubtitleLabel.topAnchor.constraint(equalTo: emptyStateTitleLabel.bottomAnchor, constant: 8),
+            emptyStateSubtitleLabel.centerXAnchor.constraint(equalTo: emptyStateView.centerXAnchor),
+            emptyStateSubtitleLabel.leadingAnchor.constraint(greaterThanOrEqualTo: emptyStateView.leadingAnchor, constant: 20),
+            emptyStateSubtitleLabel.trailingAnchor.constraint(lessThanOrEqualTo: emptyStateView.trailingAnchor, constant: -20)
+        ])
+    }
+    
+    private func setupNoResultsState() {
+        noResultsView.addSubview(noResultsImageView)
+        noResultsView.addSubview(noResultsTitleLabel)
+        noResultsView.addSubview(noResultsSubtitleLabel)
+        
+        NSLayoutConstraint.activate([
+            noResultsImageView.centerXAnchor.constraint(equalTo: noResultsView.centerXAnchor),
+            noResultsImageView.centerYAnchor.constraint(equalTo: noResultsView.centerYAnchor, constant: -40),
+            noResultsImageView.widthAnchor.constraint(equalToConstant: 80),
+            noResultsImageView.heightAnchor.constraint(equalToConstant: 80),
+            
+            noResultsTitleLabel.topAnchor.constraint(equalTo: noResultsImageView.bottomAnchor, constant: 20),
+            noResultsTitleLabel.centerXAnchor.constraint(equalTo: noResultsView.centerXAnchor),
+            noResultsTitleLabel.leadingAnchor.constraint(greaterThanOrEqualTo: noResultsView.leadingAnchor, constant: 20),
+            noResultsTitleLabel.trailingAnchor.constraint(lessThanOrEqualTo: noResultsView.trailingAnchor, constant: -20),
+            
+            noResultsSubtitleLabel.topAnchor.constraint(equalTo: noResultsTitleLabel.bottomAnchor, constant: 8),
+            noResultsSubtitleLabel.centerXAnchor.constraint(equalTo: noResultsView.centerXAnchor),
+            noResultsSubtitleLabel.leadingAnchor.constraint(greaterThanOrEqualTo: noResultsView.leadingAnchor, constant: 20),
+            noResultsSubtitleLabel.trailingAnchor.constraint(lessThanOrEqualTo: noResultsView.trailingAnchor, constant: -20)
+        ])
+    }
+    
+    private func setupConstraints() {
+        NSLayoutConstraint.activate([
+            searchBarContainer.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 8),
+            searchBarContainer.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+            searchBarContainer.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+            searchBarContainer.heightAnchor.constraint(equalToConstant: 44),
+            
+            searchIcon.leadingAnchor.constraint(equalTo: searchBarContainer.leadingAnchor, constant: 12),
+            searchIcon.centerYAnchor.constraint(equalTo: searchBarContainer.centerYAnchor),
+            searchIcon.widthAnchor.constraint(equalToConstant: 20),
+            searchIcon.heightAnchor.constraint(equalToConstant: 20),
+            
+            searchTextField.leadingAnchor.constraint(equalTo: searchIcon.trailingAnchor, constant: 8),
+            searchTextField.centerYAnchor.constraint(equalTo: searchBarContainer.centerYAnchor),
+            searchTextField.trailingAnchor.constraint(equalTo: clearButton.leadingAnchor, constant: -8),
+            
+            clearButton.trailingAnchor.constraint(equalTo: searchBarContainer.trailingAnchor, constant: -12),
+            clearButton.centerYAnchor.constraint(equalTo: searchBarContainer.centerYAnchor),
+            clearButton.widthAnchor.constraint(equalToConstant: 20),
+            clearButton.heightAnchor.constraint(equalToConstant: 20),
+            
+            resultsLabel.topAnchor.constraint(equalTo: searchBarContainer.bottomAnchor, constant: 8),
+            resultsLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+            resultsLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+            
+            tableView.topAnchor.constraint(equalTo: resultsLabel.bottomAnchor, constant: 8),
+            tableView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            tableView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            
+            loadingView.topAnchor.constraint(equalTo: view.topAnchor),
+            loadingView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            loadingView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            loadingView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            
+            activityIndicator.centerXAnchor.constraint(equalTo: loadingView.centerXAnchor),
+            activityIndicator.centerYAnchor.constraint(equalTo: loadingView.centerYAnchor, constant: -20),
+            
+            loadingLabel.topAnchor.constraint(equalTo: activityIndicator.bottomAnchor, constant: 16),
+            loadingLabel.centerXAnchor.constraint(equalTo: loadingView.centerXAnchor),
+            
+            emptyStateView.topAnchor.constraint(equalTo: resultsLabel.bottomAnchor),
+            emptyStateView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            emptyStateView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            emptyStateView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            
+            noResultsView.topAnchor.constraint(equalTo: resultsLabel.bottomAnchor),
+            noResultsView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            noResultsView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            noResultsView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        ])
+    }
+    
+    private func setupBindings() {
+        // Doctors list
+        viewModel.doctors
+            .sink { [weak self] _ in
+                self?.updateUI()
+            }
+            .store(in: &cancellables)
+        
+        // Loading state
+        viewModel.isLoading
+            .sink { [weak self] isLoading in
+                self?.updateLoadingState(isLoading)
+            }
+            .store(in: &cancellables)
+        
+        // Search text
+        viewModel.searchText
+            .sink { [weak self] searchText in
+                self?.updateUI()
+            }
+            .store(in: &cancellables)
+        
+        // Show error
+        viewModel.showError
+            .sink { [weak self] showError in
+                guard showError, let errorMessage = self?.viewModel.errorMessage.value else { return }
+                self?.showAlert(title: "Error", message: errorMessage)
+            }
+            .store(in: &cancellables)
+    }
+    
+    private func setupActions() {
+        searchTextField.addTarget(self, action: #selector(searchTextChanged), for: .editingChanged)
+        clearButton.addTarget(self, action: #selector(clearButtonTapped), for: .touchUpInside)
+        refreshControl.addTarget(self, action: #selector(refreshTapped), for: .valueChanged)
+    }
+    
+    // MARK: - Helper Methods
+    private func updateUI() {
+        filteredDoctors = viewModel.filteredDoctors
+        tableView.reloadData()
+        
+        let doctorCount = filteredDoctors.count
+        let searchText = viewModel.searchText.value
+        
+        // Update results label
+        if !searchText.isEmpty {
+            resultsLabel.text = "\(doctorCount) doctor\(doctorCount == 1 ? "" : "s") found"
+        } else {
+            resultsLabel.text = "\(doctorCount) doctor\(doctorCount == 1 ? "" : "s") found"
+        }
+        
+        // Show/hide states
+        let hasDoctors = !viewModel.doctors.value.isEmpty
+        let hasFilteredResults = !filteredDoctors.isEmpty
+        let isSearching = !searchText.isEmpty
+        
+        tableView.isHidden = !hasFilteredResults
+        emptyStateView.isHidden = hasDoctors
+        noResultsView.isHidden = !isSearching || hasFilteredResults
+        
+        // Update clear button
+        clearButton.isHidden = searchText.isEmpty
+    }
+    
+    private func updateLoadingState(_ isLoading: Bool) {
+        if isLoading && !refreshControl.isRefreshing {
+            loadingView.isHidden = false
+            activityIndicator.startAnimating()
+        } else {
+            loadingView.isHidden = true
+            activityIndicator.stopAnimating()
+            refreshControl.endRefreshing()
+        }
+        
+        navigationItem.rightBarButtonItem?.isEnabled = !isLoading
+    }
+    
+    private func showAlert(title: String, message: String) {
+        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        present(alert, animated: true)
+    }
+    
+    // MARK: - Actions
+    @objc private func backTapped() {
+        dismiss(animated: true)
+    }
+    
+    @objc private func refreshTapped() {
+        Task {
+            await viewModel.refreshDoctors()
+        }
+    }
+    
+    @objc private func searchTextChanged() {
+        viewModel.searchText.send(searchTextField.text ?? "")
+    }
+    
+    @objc private func clearButtonTapped() {
+        searchTextField.text = ""
+        viewModel.searchText.send("")
+        searchTextField.resignFirstResponder()
+    }
+}
+
+// MARK: - UITableView DataSource & Delegate
+extension DoctorListViewController: UITableViewDataSource, UITableViewDelegate {
+    
+    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+        return filteredDoctors.count
+    }
+    
+    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        let cell = tableView.dequeueReusableCell(withIdentifier: DoctorTableViewCell.identifier, for: indexPath) as! DoctorTableViewCell
+        let doctor = filteredDoctors[indexPath.row]
+        cell.configure(with: doctor)
+        return cell
+    }
+    
+    func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
+        return UITableView.automaticDimension
+    }
+    
+    func tableView(_ tableView: UITableView, estimatedHeightForRowAt indexPath: IndexPath) -> CGFloat {
+        return 140
+    }
+    
+    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        tableView.deselectRow(at: indexPath, animated: true)
+    }
+}
