@@ -1,0 +1,34 @@
+//Created by Balkrishan sharma
+//07-01-26
+import Foundation
+import Combine
+
+class DoctorListViewModel {
+    // Published properties using Combine
+    let doctors = CurrentValueSubject<[Doctor], Never>([])
+    let isLoading = CurrentValueSubject<Bool, Never>(false)
+    let errorMessage = CurrentValueSubject<String?, Never>(nil)
+    let showError = CurrentValueSubject<Bool, Never>(false)
+    let searchText = CurrentValueSubject<String, Never>("")
+    
+    private let apiService = APIService()
+    private var cancellables = Set<AnyCancellable>()
+    
+    // Computed property for filtered doctors
+    var filteredDoctors: [Doctor] {
+        let search = searchText.value
+        if search.isEmpty {
+            return doctors.value
+        }
+        
+        let lowercasedSearch = search.lowercased()
+        return doctors.value.filter { doctor in
+            doctor.name.lowercased().contains(lowercasedSearch) ||
+            (doctor.email?.lowercased().contains(lowercasedSearch) ?? false) ||
+            (doctor.phoneNo?.contains(search) ?? false) ||
+            doctor.id.lowercased().contains(lowercasedSearch)
+        }
+    }
+    
+    // Fetch all doctors
+    func fetchDoctors() async {
