@@ -1,0 +1,31 @@
+//Created by Balkrishan Sharma
+//07-01-26
+import Foundation
+import Combine
+
+class RegistrationViewModel {
+    // Form fields
+    let fullName = CurrentValueSubject<String, Never>("")
+    let email = CurrentValueSubject<String, Never>("")
+    let selectedGender = CurrentValueSubject<String, Never>("M")
+    let phoneNo = CurrentValueSubject<String, Never>("")
+    let whatsappNo = CurrentValueSubject<String, Never>("")
+    let age = CurrentValueSubject<String, Never>("")
+    
+    // UI state
+    let isLoading = CurrentValueSubject<Bool, Never>(false)
+    let errorMessage = CurrentValueSubject<String?, Never>(nil)
+    let showError = CurrentValueSubject<Bool, Never>(false)
+    let registrationSuccess = CurrentValueSubject<Bool, Never>(false)
+    let doctorId = CurrentValueSubject<String?, Never>(nil)
+    
+    // Validation state
+    let hasAttemptedSubmit = CurrentValueSubject<Bool, Never>(false)
+    
+    private let apiService = APIService()
+    private var cancellables = Set<AnyCancellable>()
+    
+    // Individual field validations
+    var isNameValid: Bool {
+        !fullName.value.trimmingCharacters(in: .whitespaces).isEmpty && fullName.value.count >= 2
+    }
