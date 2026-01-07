@@ -1,0 +1,25 @@
+//Created by Balkrishan sharma
+//07-01-26
+import Foundation
+import Combine
+
+class DashboardViewModel {
+    // Published properties using Combine
+    let userName = CurrentValueSubject<String, Never>("Guest")
+    let errorMessage = CurrentValueSubject<String?, Never>(nil)
+    
+    private let apiService = APIService()
+    
+    func fetchDoctorDetails(id: String) async {
+        do {
+            let doctor = try await apiService.fetchDoctor(id: id)
+            await MainActor.run {
+                userName.send(doctor.name)
+            }
+        } catch {
+            await MainActor.run {
+                errorMessage.send("Failed to load doctor details: \(error.localizedDescription)")
+            }
+        }
+    }
+}
