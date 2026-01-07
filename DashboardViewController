@@ -1,0 +1,467 @@
+//Created By Balkrishan Sharma
+//07-01-26
+import UIKit
+import Combine
+
+class DashboardViewController: UIViewController {
+    
+    // MARK: - Properties
+    private let viewModel = DashboardViewModel()
+    private var cancellables = Set<AnyCancellable>()
+    
+    // MARK: - UI Components
+    private let scrollView: UIScrollView = {
+        let scrollView = UIScrollView()
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.showsVerticalScrollIndicator = true
+        return scrollView
+    }()
+    
+    private let contentStackView: UIStackView = {
+        let stackView = UIStackView()
+        stackView.axis = .vertical
+        stackView.spacing = 20
+        stackView.translatesAutoresizingMaskIntoConstraints = false
+        return stackView
+    }()
+    
+    // Header
+    private let headerView: UIView = {
+        let view = UIView()
+        view.translatesAutoresizingMaskIntoConstraints = false
+        return view
+    }()
+    
+    private let greetingLabel: UILabel = {
+        let label = UILabel()
+        label.text = "Hello,"
+        label.font = .systemFont(ofSize: 20)
+        label.textColor = .gray
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+    
+    private let nameLabel: UILabel = {
+        let label = UILabel()
+        label.text = "Guest!"
+        label.font = .systemFont(ofSize: 28, weight: .bold)
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+    
+    private let notificationButton: UIButton = {
+        let button = UIButton(type: .system)
+        let config = UIImage.SymbolConfiguration(pointSize: 24)
+        button.setImage(UIImage(systemName: "bell.fill", withConfiguration: config), for: .normal)
+        button.tintColor = .label
+        button.translatesAutoresizingMaskIntoConstraints = false
+        return button
+    }()
+    
+    private let notificationBadge: UIView = {
+        let view = UIView()
+        view.backgroundColor = .red
+        view.layer.cornerRadius = 4
+        view.translatesAutoresizingMaskIntoConstraints = false
+        return view
+    }()
+    
+    // Search Bar
+    private let searchBarContainer: UIView = {
+        let view = UIView()
+        view.backgroundColor = .white
+        view.layer.cornerRadius = 12
+        view.layer.shadowColor = UIColor.gray.cgColor
+        view.layer.shadowOpacity = 0.2
+        view.layer.shadowOffset = CGSize(width: 0, height: 2)
+        view.layer.shadowRadius = 5
+        view.translatesAutoresizingMaskIntoConstraints = false
+        return view
+    }()
+    
+    private let searchIcon: UIImageView = {
+        let imageView = UIImageView()
+        imageView.image = UIImage(systemName: "magnifyingglass")
+        imageView.tintColor = .gray
+        imageView.contentMode = .scaleAspectFit
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        return imageView
+    }()
+    
+    private let searchLabel: UILabel = {
+        let label = UILabel()
+        label.text = "Search..."
+        label.textColor = .gray
+        label.font = .systemFont(ofSize: 16)
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+    
+    // Banner
+    private let bannerView: UIView = {
+        let view = UIView()
+        view.layer.cornerRadius = 20
+        view.layer.masksToBounds = true
+        view.translatesAutoresizingMaskIntoConstraints = false
+        return view
+    }()
+    
+    private let bannerTitleLabel: UILabel = {
+        let label = UILabel()
+        label.text = "Stay Safe\nStay Healthy!"
+        label.font = .systemFont(ofSize: 24, weight: .bold)
+        label.textColor = .white
+        label.numberOfLines = 2
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+    
+    private let bannerSubtitleLabel: UILabel = {
+        let label = UILabel()
+        label.text = "An apple a day\nkeeps the doctor away."
+        label.font = .systemFont(ofSize: 13)
+        label.textColor = UIColor.white.withAlphaComponent(0.9)
+        label.numberOfLines = 2
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+    
+    private let bannerIconImageView: UIImageView = {
+        let imageView = UIImageView()
+        let config = UIImage.SymbolConfiguration(pointSize: 60, weight: .light)
+        imageView.image = UIImage(systemName: "stethoscope", withConfiguration: config)
+        imageView.tintColor = UIColor.white.withAlphaComponent(0.3)
+        imageView.contentMode = .scaleAspectFit
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        return imageView
+    }()
+    
+    // Page Control
+    private let pageControl: UIPageControl = {
+        let pageControl = UIPageControl()
+        pageControl.numberOfPages = 3
+        pageControl.currentPage = 0
+        pageControl.pageIndicatorTintColor = UIColor.gray.withAlphaComponent(0.3)
+        pageControl.currentPageIndicatorTintColor = .systemOrange
+        pageControl.translatesAutoresizingMaskIntoConstraints = false
+        return pageControl
+    }()
+    
+    // Section Title
+    private let sectionTitleLabel: UILabel = {
+        let label = UILabel()
+        label.text = "At your Fingertip"
+        label.font = .systemFont(ofSize: 24, weight: .bold)
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+    
+    // Feature Cards Collection View
+    private lazy var featureCollectionView: UICollectionView = {
+        let layout = UICollectionViewFlowLayout()
+        layout.scrollDirection = .vertical
+        layout.minimumInteritemSpacing = 16
+        layout.minimumLineSpacing = 16
+        
+        let collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
+        collectionView.backgroundColor = .clear
+        collectionView.isScrollEnabled = false
+        collectionView.translatesAutoresizingMaskIntoConstraints = false
+        collectionView.register(FeatureCardCell.self, forCellWithReuseIdentifier: FeatureCardCell.identifier)
+        return collectionView
+    }()
+    
+    // Action Buttons
+    private let registerButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.setTitle("Register New Doctor", for: .normal)
+        button.setTitleColor(.white, for: .normal)
+        button.titleLabel?.font = .systemFont(ofSize: 16, weight: .semibold)
+        button.backgroundColor = .systemGreen
+        button.layer.cornerRadius = 12
+        button.translatesAutoresizingMaskIntoConstraints = false
+        
+        let icon = UIImageView(image: UIImage(systemName: "person.badge.plus"))
+        icon.tintColor = .white
+        icon.translatesAutoresizingMaskIntoConstraints = false
+        button.addSubview(icon)
+        
+        NSLayoutConstraint.activate([
+            icon.leadingAnchor.constraint(equalTo: button.leadingAnchor, constant: 16),
+            icon.centerYAnchor.constraint(equalTo: button.centerYAnchor),
+            icon.widthAnchor.constraint(equalToConstant: 24),
+            icon.heightAnchor.constraint(equalToConstant: 24)
+        ])
+        
+        return button
+    }()
+    
+    private let viewDoctorsButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.setTitle("View All Doctors", for: .normal)
+        button.setTitleColor(.white, for: .normal)
+        button.titleLabel?.font = .systemFont(ofSize: 16, weight: .semibold)
+        button.backgroundColor = .systemBlue
+        button.layer.cornerRadius = 12
+        button.translatesAutoresizingMaskIntoConstraints = false
+        
+        let icon = UIImageView(image: UIImage(systemName: "list.bullet.rectangle"))
+        icon.tintColor = .white
+        icon.translatesAutoresizingMaskIntoConstraints = false
+        button.addSubview(icon)
+        
+        NSLayoutConstraint.activate([
+            icon.leadingAnchor.constraint(equalTo: button.leadingAnchor, constant: 16),
+            icon.centerYAnchor.constraint(equalTo: button.centerYAnchor),
+            icon.widthAnchor.constraint(equalToConstant: 24),
+            icon.heightAnchor.constraint(equalToConstant: 24)
+        ])
+        
+        return button
+    }()
+    
+    // Feature cards data
+    private let featureCards: [(icon: String, title: String, isOrange: Bool)] = [
+        ("qrcode", "Scan", true),
+        ("syringe.fill", "Vaccine", false),
+        ("calendar", "My Bookings", false),
+        ("building.2.fill", "Clinic", false),
+        ("cross.case.fill", "Ambulance", false),
+        ("cross.fill", "Nurse", false)
+    ]
+    
+    // MARK: - Lifecycle
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        setupUI()
+        setupBindings()
+        setupActions()
+    }
+    
+    // MARK: - Setup
+    private func setupUI() {
+        view.backgroundColor = UIColor.systemGroupedBackground
+        
+        // Add scroll view
+        view.addSubview(scrollView)
+        scrollView.addSubview(contentStackView)
+        
+        // Setup header
+        setupHeader()
+        contentStackView.addArrangedSubview(headerView)
+        
+        // Setup search bar
+        setupSearchBar()
+        contentStackView.addArrangedSubview(searchBarContainer)
+        
+        // Setup banner
+        setupBanner()
+        contentStackView.addArrangedSubview(bannerView)
+        
+        // Add page control
+        contentStackView.addArrangedSubview(pageControl)
+        
+        // Add section title
+        contentStackView.addArrangedSubview(sectionTitleLabel)
+        contentStackView.setCustomSpacing(16, after: sectionTitleLabel)
+        
+        // Setup feature cards
+        featureCollectionView.delegate = self
+        featureCollectionView.dataSource = self
+        contentStackView.addArrangedSubview(featureCollectionView)
+        
+        // Add action buttons
+        contentStackView.addArrangedSubview(registerButton)
+        contentStackView.addArrangedSubview(viewDoctorsButton)
+        
+        // Setup constraints
+        setupConstraints()
+    }
+    
+    private func setupHeader() {
+        let labelsStackView = UIStackView(arrangedSubviews: [greetingLabel, nameLabel])
+        labelsStackView.axis = .vertical
+        labelsStackView.spacing = 4
+        labelsStackView.translatesAutoresizingMaskIntoConstraints = false
+        
+        headerView.addSubview(labelsStackView)
+        headerView.addSubview(notificationButton)
+        notificationButton.addSubview(notificationBadge)
+        
+        NSLayoutConstraint.activate([
+            headerView.heightAnchor.constraint(equalToConstant: 80),
+            
+            labelsStackView.leadingAnchor.constraint(equalTo: headerView.leadingAnchor, constant: 16),
+            labelsStackView.centerYAnchor.constraint(equalTo: headerView.centerYAnchor),
+            labelsStackView.trailingAnchor.constraint(lessThanOrEqualTo: notificationButton.leadingAnchor, constant: -16),
+            
+            notificationButton.trailingAnchor.constraint(equalTo: headerView.trailingAnchor, constant: -16),
+            notificationButton.centerYAnchor.constraint(equalTo: headerView.centerYAnchor),
+            notificationButton.widthAnchor.constraint(equalToConstant: 44),
+            notificationButton.heightAnchor.constraint(equalToConstant: 44),
+            
+            notificationBadge.topAnchor.constraint(equalTo: notificationButton.topAnchor, constant: 8),
+            notificationBadge.trailingAnchor.constraint(equalTo: notificationButton.trailingAnchor, constant: -8),
+            notificationBadge.widthAnchor.constraint(equalToConstant: 8),
+            notificationBadge.heightAnchor.constraint(equalToConstant: 8)
+        ])
+    }
+    
+    private func setupSearchBar() {
+        searchBarContainer.addSubview(searchIcon)
+        searchBarContainer.addSubview(searchLabel)
+        
+        NSLayoutConstraint.activate([
+            searchBarContainer.heightAnchor.constraint(equalToConstant: 50),
+            
+            searchIcon.leadingAnchor.constraint(equalTo: searchBarContainer.leadingAnchor, constant: 16),
+            searchIcon.centerYAnchor.constraint(equalTo: searchBarContainer.centerYAnchor),
+            searchIcon.widthAnchor.constraint(equalToConstant: 20),
+            searchIcon.heightAnchor.constraint(equalToConstant: 20),
+            
+            searchLabel.leadingAnchor.constraint(equalTo: searchIcon.trailingAnchor, constant: 12),
+            searchLabel.centerYAnchor.constraint(equalTo: searchBarContainer.centerYAnchor),
+            searchLabel.trailingAnchor.constraint(equalTo: searchBarContainer.trailingAnchor, constant: -16)
+        ])
+    }
+    
+    private func setupBanner() {
+        // Add gradient layer
+        let gradientLayer = CAGradientLayer()
+        gradientLayer.colors = [
+            UIColor.systemBlue.cgColor,
+            UIColor.systemBlue.withAlphaComponent(0.8).cgColor
+        ]
+        gradientLayer.startPoint = CGPoint(x: 0, y: 0)
+        gradientLayer.endPoint = CGPoint(x: 1, y: 1)
+        gradientLayer.frame = CGRect(x: 0, y: 0, width: UIScreen.main.bounds.width - 32, height: 200)
+        bannerView.layer.insertSublayer(gradientLayer, at: 0)
+        
+        bannerView.addSubview(bannerTitleLabel)
+        bannerView.addSubview(bannerSubtitleLabel)
+        bannerView.addSubview(bannerIconImageView)
+        
+        NSLayoutConstraint.activate([
+            bannerView.heightAnchor.constraint(equalToConstant: 200),
+            
+            bannerTitleLabel.leadingAnchor.constraint(equalTo: bannerView.leadingAnchor, constant: 30),
+            bannerTitleLabel.topAnchor.constraint(equalTo: bannerView.topAnchor, constant: 40),
+            
+            bannerSubtitleLabel.leadingAnchor.constraint(equalTo: bannerTitleLabel.leadingAnchor),
+            bannerSubtitleLabel.topAnchor.constraint(equalTo: bannerTitleLabel.bottomAnchor, constant: 8),
+            
+            bannerIconImageView.trailingAnchor.constraint(equalTo: bannerView.trailingAnchor, constant: -30),
+            bannerIconImageView.centerYAnchor.constraint(equalTo: bannerView.centerYAnchor),
+            bannerIconImageView.widthAnchor.constraint(equalToConstant: 80),
+            bannerIconImageView.heightAnchor.constraint(equalToConstant: 80)
+        ])
+    }
+    
+    private func setupConstraints() {
+        NSLayoutConstraint.activate([
+            scrollView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            
+            contentStackView.topAnchor.constraint(equalTo: scrollView.topAnchor),
+            contentStackView.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
+            contentStackView.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
+            contentStackView.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: -30),
+            contentStackView.widthAnchor.constraint(equalTo: scrollView.widthAnchor),
+            
+            featureCollectionView.heightAnchor.constraint(equalToConstant: 232),
+            
+            registerButton.heightAnchor.constraint(equalToConstant: 50),
+            registerButton.leadingAnchor.constraint(equalTo: contentStackView.leadingAnchor, constant: 16),
+            registerButton.trailingAnchor.constraint(equalTo: contentStackView.trailingAnchor, constant: -16),
+            
+            viewDoctorsButton.heightAnchor.constraint(equalToConstant: 50),
+            viewDoctorsButton.leadingAnchor.constraint(equalTo: contentStackView.leadingAnchor, constant: 16),
+            viewDoctorsButton.trailingAnchor.constraint(equalTo: contentStackView.trailingAnchor, constant: -16)
+        ])
+        
+        // Set padding for some elements
+        contentStackView.layoutMargins = UIEdgeInsets(top: 0, left: 16, bottom: 0, right: 16)
+        contentStackView.isLayoutMarginsRelativeArrangement = true
+    }
+    
+    private func setupBindings() {
+        viewModel.userName
+            .sink { [weak self] name in
+                self?.nameLabel.text = "\(name)!"
+            }
+            .store(in: &cancellables)
+    }
+    
+    private func setupActions() {
+        registerButton.addTarget(self, action: #selector(registerButtonTapped), for: .touchUpInside)
+        viewDoctorsButton.addTarget(self, action: #selector(viewDoctorsButtonTapped), for: .touchUpInside)
+    }
+    
+    // MARK: - Actions
+    @objc private func registerButtonTapped() {
+        let registrationVC = RegistrationViewController()
+        let navController = UINavigationController(rootViewController: registrationVC)
+        navController.modalPresentationStyle = .fullScreen
+        present(navController, animated: true)
+    }
+    
+    @objc private func viewDoctorsButtonTapped() {
+        let doctorListVC = DoctorListViewController()
+        let navController = UINavigationController(rootViewController: doctorListVC)
+        navController.modalPresentationStyle = .fullScreen
+        present(navController, animated: true)
+    }
+}
+
+// MARK: - UICollectionView DataSource & Delegate
+extension DashboardViewController: UICollectionViewDataSource, UICollectionViewDelegate, UICollectionViewDelegateFlowLayout {
+    
+    func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
+        return featureCards.count
+    }
+    
+    func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+        let cell = collectionView.dequeueReusableCell(withReuseIdentifier: FeatureCardCell.identifier, for: indexPath) as! FeatureCardCell
+        let card = featureCards[indexPath.item]
+        cell.configure(icon: card.icon, title: card.title, isOrange: card.isOrange)
+        return cell
+    }
+    
+    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
+        let totalSpacing: CGFloat = 32 + 32 // left + right margins + 2 spaces between 3 items
+        let width = (collectionView.bounds.width - totalSpacing) / 3
+        return CGSize(width: width, height: 100)
+    }
+    
+    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, insetForSectionAt section: Int) -> UIEdgeInsets {
+        return UIEdgeInsets(top: 0, left: 16, bottom: 0, right: 16)
+    }
+}
+
+// MARK: - Feature Card Cell
+class FeatureCardCell: UICollectionViewCell {
+    
+    static let identifier = "FeatureCardCell"
+    
+    private var featureCardView: FeatureCardView?
+    
+    func configure(icon: String, title: String, isOrange: Bool) {
+        featureCardView?.removeFromSuperview()
+        
+        let backgroundColor: UIColor = isOrange ? .systemOrange : .white
+        let cardView = FeatureCardView(icon: icon, title: title, backgroundColor: backgroundColor, isOrange: isOrange)
+        
+        contentView.addSubview(cardView)
+        
+        NSLayoutConstraint.activate([
+            cardView.topAnchor.constraint(equalTo: contentView.topAnchor),
+            cardView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            cardView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            cardView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor)
+        ])
+        
+        featureCardView = cardView
+    }
+}
