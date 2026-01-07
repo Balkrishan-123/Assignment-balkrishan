@@ -1,0 +1,27 @@
+//Created by Balkrishan Sharma
+//07-01-26
+port Foundation
+
+struct RegistrationRequest: Codable {
+    let name: String
+    let nameUpper: String
+    let phoneNo: String
+    let whatsappNo: String
+    let countryCode: String
+    let email: String
+    let gender: String
+    let age: String
+    let ageUnit: String
+    
+    enum CodingKeys: String, CodingKey {
+        case name = "Name"
+        case nameUpper = "NameUpper"
+        case phoneNo = "PhoneNo"
+        case whatsappNo = "WhatsappNo"
+        case countryCode = "CountryCode"
+        case email = "Email"
+        case gender = "Gender"
+        case age = "Age"
+        case ageUnit = "AgeUnit"
+    }
+}
