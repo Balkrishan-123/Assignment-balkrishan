@@ -1,0 +1,112 @@
+//Created by Balkrishan Sharma
+//07-01-26
+import Foundation
+
+class ODataXMLParser: NSObject, XMLParserDelegate {
+    
+    private var doctors: [Doctor] = []
+    private var currentElement = ""
+    private var currentValue = ""
+    
+    // Current doctor being parsed
+    private var currentID: String?
+    private var currentName: String?
+    private var currentNameUpper: String?
+    private var currentPhoneNo: String?
+    private var currentWhatsappNo: String?
+    private var currentCountryCode: String?
+    private var currentEmail: String?
+    private var currentGender: String?
+    private var currentAge: String?
+    private var currentAgeUnit: String?
+    
+    private var isInProperties = false
+    
+    func parse(data: Data) -> [Doctor]? {
+        let parser = XMLParser(data: data)
+        parser.delegate = self
+        
+        if parser.parse() {
+            return doctors
+        } else {
+            return nil
+        }
+    }
+    
+    // MARK: - XMLParserDelegate Methods
+    
+    func parser(_ parser: XMLParser, didStartElement elementName: String, namespaceURI: String?, qualifiedName qName: String?, attributes attributeDict: [String : String] = [:]) {
+        currentElement = elementName
+        currentValue = ""
+        
+        if elementName == "m:properties" {
+            isInProperties = true
+        }
+    }
+    
+    func parser(_ parser: XMLParser, foundCharacters string: String) {
+        currentValue += string.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    
+    func parser(_ parser: XMLParser, didEndElement elementName: String, namespaceURI: String?, qualifiedName qName: String?) {
+        
+        guard isInProperties else { return }
+        
+        switch elementName {
+        case "d:ID":
+            currentID = currentValue
+        case "d:Name":
+            currentName = currentValue
+        case "d:NameUpper":
+            currentNameUpper = currentValue
+        case "d:PhoneNo":
+            currentPhoneNo = currentValue
+        case "d:WhatsappNo":
+            currentWhatsappNo = currentValue
+        case "d:CountryCode":
+            currentCountryCode = currentValue
+        case "d:Email":
+            currentEmail = currentValue
+        case "d:Gender":
+            currentGender = currentValue
+        case "d:Age":
+            currentAge = currentValue
+        case "d:AgeUnit":
+            currentAgeUnit = currentValue
+        case "m:properties":
+            // End of properties, create doctor
+            if let id = currentID, let name = currentName {
+                let doctor = Doctor(
+                    id: id,
+                    name: name,
+                    nameUpper: currentNameUpper,
+                    phoneNo: currentPhoneNo,
+                    whatsappNo: currentWhatsappNo,
+                    countryCode: currentCountryCode,
+                    email: currentEmail,
+                    gender: currentGender,
+                    age: currentAge,
+                    ageUnit: currentAgeUnit
+                )
+                doctors.append(doctor)
+            }
+            
+            // Reset current values
+            currentID = nil
+            currentName = nil
+            currentNameUpper = nil
+            currentPhoneNo = nil
+            currentWhatsappNo = nil
+            currentCountryCode = nil
+            currentEmail = nil
+            currentGender = nil
+            currentAge = nil
+            currentAgeUnit = nil
+            isInProperties = false
+        default:
+            break
+        }
+        
+        currentValue = ""
+    }
+}
